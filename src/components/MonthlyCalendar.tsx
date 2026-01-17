@@ -1,7 +1,9 @@
 'use client';
 
-import { useState } from 'react';
-import { WorkLocation } from '@/types';
+import { useState, useEffect, useCallback } from 'react';
+import { WorkLocation, CalendarEvent, Holiday } from '@/types';
+import EventModal from './EventModal';
+import HolidayModal from './HolidayModal';
 
 const DAYS_OF_WEEK = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
 const DAYS_OF_WEEK_SHORT = ['S', 'M', 'T', 'W', 'T', 'F', 'S'];
@@ -52,10 +54,67 @@ function getWorkLocation(year: number, month: number, day: number): WorkLocation
   return null;
 }
 
+function formatDateString(year: number, month: number, day: number): string {
+  return `${year}-${String(month + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+}
+
+function getEventsForDate(events: CalendarEvent[], dateStr: string): CalendarEvent[] {
+  return events.filter((event) => {
+    return dateStr >= event.startDate && dateStr <= event.endDate;
+  });
+}
+
+function getHolidayForDate(holidays: Holiday[], dateStr: string): Holiday | undefined {
+  return holidays.find((holiday) => holiday.date === dateStr);
+}
+
 export default function MonthlyCalendar() {
   const today = new Date();
   const [currentMonth, setCurrentMonth] = useState(today.getMonth());
   const [currentYear, setCurrentYear] = useState(today.getFullYear());
+  const [events, setEvents] = useState<CalendarEvent[]>([]);
+  const [holidays, setHolidays] = useState<Holiday[]>([]);
+  const [modalOpen, setModalOpen] = useState(false);
+  const [holidayModalOpen, setHolidayModalOpen] = useState(false);
+  const [selectedDate, setSelectedDate] = useState('');
+  const [selectedEvent, setSelectedEvent] = useState<CalendarEvent | null>(null);
+  const [isLoading, setIsLoading] = useState(true);
+
+  // Fetch events from API
+  const fetchEvents = useCallback(async () => {
+    try {
+      const response = await fetch('/api/events');
+      if (response.ok) {
+        const data = await response.json();
+        setEvents(data);
+      }
+    } catch (error) {
+      console.error('Failed to fetch events:', error);
+    }
+  }, []);
+
+  // Fetch holidays from API
+  const fetchHolidays = useCallback(async () => {
+    try {
+      const response = await fetch('/api/holidays');
+      if (response.ok) {
+        const data = await response.json();
+        setHolidays(data);
+      }
+    } catch (error) {
+      console.error('Failed to fetch holidays:', error);
+    }
+  }, []);
+
+  // Load data from API on mount
+  useEffect(() => {
+    const loadData = async () => {
+      setIsLoading(true);
+      await Promise.all([fetchEvents(), fetchHolidays()]);
+      setIsLoading(false);
+    };
+    loadData();
+  }, [fetchEvents, fetchHolidays]);
 
   const daysInMonth = getDaysInMonth(currentYear, currentMonth);
   const firstDay = getFirstDayOfMonth(currentYear, currentMonth);
@@ -86,20 +145,140 @@ export default function MonthlyCalendar() {
     days.push(i);
   }
 
-  // Calculate monthly totals
+  // Create a set of holiday dates for quick lookup
+  const holidayDatesSet = new Set(holidays.map((h) => h.date));
+
+  // Calculate monthly totals (excluding holidays)
   let wfoCount = 0;
   let wfhCount = 0;
   for (let day = 1; day <= daysInMonth; day++) {
+    const dateStr = formatDateString(currentYear, currentMonth, day);
+    // Skip if this day is a holiday
+    if (holidayDatesSet.has(dateStr)) continue;
+
     const location = getWorkLocation(currentYear, currentMonth, day);
     if (location === 'office') wfoCount++;
     if (location === 'home') wfhCount++;
+  }
+
+  const handleDayClick = (day: number) => {
+    const dateStr = formatDateString(currentYear, currentMonth, day);
+    setSelectedDate(dateStr);
+    setSelectedEvent(null);
+    setModalOpen(true);
+  };
+
+  const handleEventClick = (event: CalendarEvent, e: React.MouseEvent) => {
+    e.stopPropagation();
+    setSelectedDate(event.startDate);
+    setSelectedEvent(event);
+    setModalOpen(true);
+  };
+
+  const handleSaveEvent = async (event: CalendarEvent) => {
+    try {
+      const isExisting = events.some((e) => e.id === event.id);
+
+      if (isExisting) {
+        // Update existing event
+        const response = await fetch(`/api/events/${event.id}`, {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(event),
+        });
+        if (response.ok) {
+          const updatedEvent = await response.json();
+          setEvents((prev) =>
+            prev.map((e) => (e.id === event.id ? updatedEvent : e))
+          );
+        }
+      } else {
+        // Create new event
+        const response = await fetch('/api/events', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(event),
+        });
+        if (response.ok) {
+          const newEvent = await response.json();
+          setEvents((prev) => [...prev, newEvent]);
+        }
+      }
+    } catch (error) {
+      console.error('Failed to save event:', error);
+    }
+  };
+
+  const handleDeleteEvent = async (id: string) => {
+    try {
+      const response = await fetch(`/api/events/${id}`, {
+        method: 'DELETE',
+      });
+      if (response.ok) {
+        setEvents((prev) => prev.filter((e) => e.id !== id));
+      }
+    } catch (error) {
+      console.error('Failed to delete event:', error);
+    }
+  };
+
+  const handleAddHoliday = async (holiday: Holiday) => {
+    try {
+      const response = await fetch('/api/holidays', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(holiday),
+      });
+      if (response.ok) {
+        const newHoliday = await response.json();
+        setHolidays((prev) => [...prev, newHoliday]);
+      }
+    } catch (error) {
+      console.error('Failed to add holiday:', error);
+    }
+  };
+
+  const handleDeleteHoliday = async (id: string) => {
+    try {
+      const response = await fetch(`/api/holidays/${id}`, {
+        method: 'DELETE',
+      });
+      if (response.ok) {
+        setHolidays((prev) => prev.filter((h) => h.id !== id));
+      }
+    } catch (error) {
+      console.error('Failed to delete holiday:', error);
+    }
+  };
+
+  // Count holidays in current month
+  const holidayCount = holidays.filter((h) => {
+    const [year, month] = h.date.split('-').map(Number);
+    return year === currentYear && month === currentMonth + 1;
+  }).length;
+
+  if (isLoading) {
+    return (
+      <div className="card p-3 md:p-4 h-full flex flex-col items-center justify-center">
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-white"></div>
+        <p className="mt-2 text-gray-400 text-sm">Loading...</p>
+      </div>
+    );
   }
 
   return (
     <div className="card p-3 md:p-4 h-full flex flex-col">
       {/* Header */}
       <div className="flex items-center justify-between mb-2 shrink-0">
-        <h2 className="text-base md:text-lg font-semibold">Monthly Schedule</h2>
+        <div className="flex items-center gap-2">
+          <h2 className="text-base md:text-lg font-semibold">Monthly Schedule</h2>
+          <button
+            onClick={() => setHolidayModalOpen(true)}
+            className="px-2 py-1 text-xs bg-[var(--accent-leave)] hover:bg-[var(--accent-leave)]/80 text-white rounded-lg transition-colors"
+          >
+            Holidays
+          </button>
+        </div>
         <div className="flex items-center gap-2 md:gap-3">
           <button
             onClick={() => navigateMonth('prev')}
@@ -146,22 +325,52 @@ export default function MonthlyCalendar() {
             currentMonth === today.getMonth() &&
             currentYear === today.getFullYear();
 
+          const dateStr = formatDateString(currentYear, currentMonth, day);
+          const dayEvents = getEventsForDate(events, dateStr);
+          const holiday = getHolidayForDate(holidays, dateStr);
+
           return (
             <div
               key={day}
-              className={`flex flex-col p-1 rounded border border-[var(--card-border)] transition-colors hover:bg-[var(--card-border)]
+              onClick={() => handleDayClick(day)}
+              className={`flex flex-col p-1 rounded border transition-colors hover:bg-[var(--card-border)] cursor-pointer overflow-hidden
+                ${holiday ? 'border-[var(--accent-leave)] bg-[var(--accent-leave)]/10' : 'border-[var(--card-border)]'}
                 ${isToday ? 'ring-2 ring-white ring-opacity-50' : ''}`}
             >
-              <span className={`text-[10px] md:text-xs ${location ? '' : 'text-gray-600'}`}>{day}</span>
-              {location && (
+              <span className={`text-[10px] md:text-xs ${location || holiday ? '' : 'text-gray-600'}`}>{day}</span>
+              {holiday && (
                 <div
-                  className={`mt-auto px-1 py-0.5 rounded text-[9px] md:text-[10px] font-medium w-full text-center truncate
+                  className="px-1 py-0.5 rounded text-[9px] md:text-[10px] font-medium w-full text-center truncate bg-[var(--accent-leave)] text-white"
+                  title={holiday.name}
+                >
+                  {holiday.name}
+                </div>
+              )}
+              {!holiday && location && (
+                <div
+                  className={`px-1 py-0.5 rounded text-[9px] md:text-[10px] font-medium w-full text-center truncate
                     ${location === 'office' ? 'bg-[var(--accent-office)] text-white' : ''}
                     ${location === 'home' ? 'bg-[var(--accent-home)] text-white' : ''}`}
                 >
                   {location === 'office' ? 'Office' : 'WFH'}
                 </div>
               )}
+              <div className="flex-1 min-h-0 flex flex-col gap-0.5 mt-0.5 overflow-hidden">
+                {dayEvents.slice(0, 2).map((event) => (
+                  <div
+                    key={event.id}
+                    onClick={(e) => handleEventClick(event, e)}
+                    className="px-1 py-0.5 rounded text-[8px] md:text-[9px] font-medium text-white truncate cursor-pointer hover:brightness-110 hover:scale-[1.02] transition-all"
+                    style={{ backgroundColor: event.color }}
+                    title={`${event.name} (click to edit)`}
+                  >
+                    {event.name}
+                  </div>
+                ))}
+                {dayEvents.length > 2 && (
+                  <div className="text-[8px] text-gray-400 px-1">+{dayEvents.length - 2} more</div>
+                )}
+              </div>
             </div>
           );
         })}
@@ -177,14 +386,18 @@ export default function MonthlyCalendar() {
           <div className="text-lg md:text-xl font-bold text-white">{wfhCount}</div>
           <div className="text-[10px] md:text-xs text-white/80">WFH</div>
         </div>
+        <div className="flex-1 p-2 rounded-lg bg-[var(--accent-leave)]">
+          <div className="text-lg md:text-xl font-bold text-white">{holidayCount}</div>
+          <div className="text-[10px] md:text-xs text-white/80">Holidays</div>
+        </div>
         <div className="flex-1 p-2 rounded-lg bg-[var(--card-border)]">
           <div className="text-lg md:text-xl font-bold text-white">{wfoCount + wfhCount}</div>
-          <div className="text-[10px] md:text-xs text-white/80">Total</div>
+          <div className="text-[10px] md:text-xs text-white/80">Work Days</div>
         </div>
       </div>
 
       {/* Legend */}
-      <div className="flex gap-4 mt-2 pt-2 border-t border-[var(--card-border)] shrink-0">
+      <div className="flex flex-wrap gap-3 mt-2 pt-2 border-t border-[var(--card-border)] shrink-0">
         <div className="flex items-center gap-2">
           <div className="px-2 py-0.5 rounded text-[9px] md:text-[10px] font-medium bg-[var(--accent-home)] text-white">WFH</div>
           <span className="text-xs text-gray-400">Work from Home</span>
@@ -193,7 +406,28 @@ export default function MonthlyCalendar() {
           <div className="px-2 py-0.5 rounded text-[9px] md:text-[10px] font-medium bg-[var(--accent-office)] text-white">Office</div>
           <span className="text-xs text-gray-400">Work from Office</span>
         </div>
+        <div className="flex items-center gap-2">
+          <div className="px-2 py-0.5 rounded text-[9px] md:text-[10px] font-medium bg-[var(--accent-leave)] text-white">Holiday</div>
+          <span className="text-xs text-gray-400">Office Holiday</span>
+        </div>
       </div>
+
+      <EventModal
+        isOpen={modalOpen}
+        onClose={() => setModalOpen(false)}
+        onSave={handleSaveEvent}
+        onDelete={handleDeleteEvent}
+        initialDate={selectedDate}
+        existingEvent={selectedEvent}
+      />
+
+      <HolidayModal
+        isOpen={holidayModalOpen}
+        onClose={() => setHolidayModalOpen(false)}
+        holidays={holidays}
+        onAddHoliday={handleAddHoliday}
+        onDeleteHoliday={handleDeleteHoliday}
+      />
     </div>
   );
 }

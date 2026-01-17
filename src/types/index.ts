@@ -7,7 +7,8 @@ export interface DaySchedule {
 }
 
 export interface Holiday {
-  date: Date;
+  id: string;
+  date: string; // ISO date string YYYY-MM-DD
   name: string;
 }
 
@@ -25,4 +26,12 @@ export interface LeaveRequest {
   type: string;
   status: 'pending' | 'approved' | 'rejected';
   reason?: string;
+}
+
+export interface CalendarEvent {
+  id: string;
+  name: string;
+  startDate: string; // ISO date string YYYY-MM-DD
+  endDate: string;   // ISO date string YYYY-MM-DD
+  color: string;     // hex color
 }
