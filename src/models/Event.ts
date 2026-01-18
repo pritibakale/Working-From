@@ -6,6 +6,7 @@ export interface IEvent extends Document {
   startDate: string;
   endDate: string;
   color: string;
+  type: 'event' | 'paid-leave';
   createdAt: Date;
   updatedAt: Date;
 }
@@ -34,6 +35,11 @@ const EventSchema = new Schema<IEvent>(
       type: String,
       required: [true, 'Color is required'],
       default: '#3b82f6',
+    },
+    type: {
+      type: String,
+      enum: ['event', 'paid-leave'],
+      default: 'event',
     },
   },
   {

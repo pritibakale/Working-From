@@ -21,6 +21,7 @@ export async function GET() {
       startDate: event.startDate,
       endDate: event.endDate,
       color: event.color,
+      type: event.type || 'event',
     }));
 
     return NextResponse.json(formattedEvents);
@@ -48,6 +49,7 @@ export async function POST(request: NextRequest) {
       startDate: body.startDate,
       endDate: body.endDate,
       color: body.color,
+      type: body.type || 'event',
     });
 
     return NextResponse.json({
@@ -56,6 +58,7 @@ export async function POST(request: NextRequest) {
       startDate: event.startDate,
       endDate: event.endDate,
       color: event.color,
+      type: event.type,
     }, { status: 201 });
   } catch (error) {
     console.error('Error creating event:', error);

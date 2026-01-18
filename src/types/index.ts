@@ -28,10 +28,13 @@ export interface LeaveRequest {
   reason?: string;
 }
 
+export type EventType = 'event' | 'paid-leave';
+
 export interface CalendarEvent {
   id: string;
   name: string;
   startDate: string; // ISO date string YYYY-MM-DD
   endDate: string;   // ISO date string YYYY-MM-DD
   color: string;     // hex color
+  type: EventType;   // event type
 }

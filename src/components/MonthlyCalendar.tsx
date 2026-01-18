@@ -68,6 +68,12 @@ function getHolidayForDate(holidays: Holiday[], dateStr: string): Holiday | unde
   return holidays.find((holiday) => holiday.date === dateStr);
 }
 
+function isPaidLeaveDate(events: CalendarEvent[], dateStr: string): boolean {
+  return events.some(
+    (event) => event.type === 'paid-leave' && dateStr >= event.startDate && dateStr <= event.endDate
+  );
+}
+
 export default function MonthlyCalendar() {
   const today = new Date();
   const [currentMonth, setCurrentMonth] = useState(today.getMonth());
@@ -148,18 +154,30 @@ export default function MonthlyCalendar() {
   // Create a set of holiday dates for quick lookup
   const holidayDatesSet = new Set(holidays.map((h) => h.date));
 
-  // Calculate monthly totals (excluding holidays)
+  // Calculate monthly totals (excluding holidays and paid leaves)
   let wfoCount = 0;
   let wfhCount = 0;
+  let paidLeaveCount = 0;
+
+
   for (let day = 1; day <= daysInMonth; day++) {
     const dateStr = formatDateString(currentYear, currentMonth, day);
     // Skip if this day is a holiday
     if (holidayDatesSet.has(dateStr)) continue;
 
     const location = getWorkLocation(currentYear, currentMonth, day);
+    const hasPaidLeave = isPaidLeaveDate(events, dateStr);
+
+    // Count paid leave days (only on work days)
+    if (hasPaidLeave && location) {
+      paidLeaveCount++;
+      continue; // Don't count as work day
+    }
+
     if (location === 'office') wfoCount++;
     if (location === 'home') wfhCount++;
   }
+
 
   const handleDayClick = (day: number) => {
     const dateStr = formatDateString(currentYear, currentMonth, day);
@@ -390,6 +408,10 @@ export default function MonthlyCalendar() {
           <div className="text-lg md:text-xl font-bold text-white">{holidayCount}</div>
           <div className="text-[10px] md:text-xs text-white/80">Holidays</div>
         </div>
+        <div className="flex-1 p-2 rounded-lg bg-[#f97316]">
+          <div className="text-lg md:text-xl font-bold text-white">{paidLeaveCount}</div>
+          <div className="text-[10px] md:text-xs text-white/80">Paid Leave</div>
+        </div>
         <div className="flex-1 p-2 rounded-lg bg-[var(--card-border)]">
           <div className="text-lg md:text-xl font-bold text-white">{wfoCount + wfhCount}</div>
           <div className="text-[10px] md:text-xs text-white/80">Work Days</div>
@@ -409,6 +431,10 @@ export default function MonthlyCalendar() {
         <div className="flex items-center gap-2">
           <div className="px-2 py-0.5 rounded text-[9px] md:text-[10px] font-medium bg-[var(--accent-leave)] text-white">Holiday</div>
           <span className="text-xs text-gray-400">Office Holiday</span>
+        </div>
+        <div className="flex items-center gap-2">
+          <div className="px-2 py-0.5 rounded text-[9px] md:text-[10px] font-medium bg-[#f97316] text-white">Leave</div>
+          <span className="text-xs text-gray-400">Paid Leave</span>
         </div>
       </div>
 

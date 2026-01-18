@@ -27,6 +27,7 @@ export async function PUT(
         startDate: body.startDate,
         endDate: body.endDate,
         color: body.color,
+        type: body.type || 'event',
       },
       { new: true, runValidators: true }
     );
@@ -41,6 +42,7 @@ export async function PUT(
       startDate: event.startDate,
       endDate: event.endDate,
       color: event.color,
+      type: event.type,
     });
   } catch (error) {
     console.error('Error updating event:', error);

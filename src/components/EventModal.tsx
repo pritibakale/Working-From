@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { CalendarEvent } from '@/types';
+import { CalendarEvent, EventType } from '@/types';
 
 interface EventModalProps {
   isOpen: boolean;
@@ -27,6 +27,8 @@ const PRESET_COLORS = [
   '#ec4899', // pink
 ];
 
+const PAID_LEAVE_COLOR = '#f97316'; // orange for paid leave
+
 export default function EventModal({
   isOpen,
   onClose,
@@ -39,6 +41,7 @@ export default function EventModal({
   const [startDate, setStartDate] = useState(initialDate);
   const [endDate, setEndDate] = useState(initialDate);
   const [color, setColor] = useState(PRESET_COLORS[8]); // default blue
+  const [eventType, setEventType] = useState<EventType>('event');
 
   useEffect(() => {
     if (existingEvent) {
@@ -46,13 +49,26 @@ export default function EventModal({
       setStartDate(existingEvent.startDate);
       setEndDate(existingEvent.endDate);
       setColor(existingEvent.color);
+      setEventType(existingEvent.type || 'event');
     } else {
       setName('');
       setStartDate(initialDate);
       setEndDate(initialDate);
       setColor(PRESET_COLORS[8]);
+      setEventType('event');
     }
   }, [existingEvent, initialDate, isOpen]);
+
+  const handleTypeChange = (type: EventType) => {
+    setEventType(type);
+    if (type === 'paid-leave') {
+      setColor(PAID_LEAVE_COLOR);
+      if (!name) setName('Paid Leave');
+    } else if (name === 'Paid Leave') {
+      setName('');
+      setColor(PRESET_COLORS[8]);
+    }
+  };
 
   if (!isOpen) return null;
 
@@ -66,6 +82,7 @@ export default function EventModal({
       startDate,
       endDate,
       color,
+      type: eventType,
     };
 
     onSave(event);
@@ -99,12 +116,40 @@ export default function EventModal({
 
         <form onSubmit={handleSubmit} className="space-y-4">
           <div>
+            <label className="block text-sm text-gray-400 mb-2">Event Type</label>
+            <div className="flex gap-2">
+              <button
+                type="button"
+                onClick={() => handleTypeChange('event')}
+                className={`flex-1 px-3 py-2 text-sm rounded-lg transition-colors ${
+                  eventType === 'event'
+                    ? 'bg-[var(--accent-office)] text-white'
+                    : 'bg-[var(--card-border)] text-gray-400 hover:text-white'
+                }`}
+              >
+                Event
+              </button>
+              <button
+                type="button"
+                onClick={() => handleTypeChange('paid-leave')}
+                className={`flex-1 px-3 py-2 text-sm rounded-lg transition-colors ${
+                  eventType === 'paid-leave'
+                    ? 'bg-[#f97316] text-white'
+                    : 'bg-[var(--card-border)] text-gray-400 hover:text-white'
+                }`}
+              >
+                Paid Leave
+              </button>
+            </div>
+          </div>
+
+          <div>
             <label className="block text-sm text-gray-400 mb-1">Event Name</label>
             <input
               type="text"
               value={name}
               onChange={(e) => setName(e.target.value)}
-              placeholder="Enter event name"
+              placeholder={eventType === 'paid-leave' ? 'e.g., Vacation, Sick Leave' : 'Enter event name'}
               className="w-full px-3 py-2 bg-[var(--background)] border border-[var(--card-border)] rounded-lg text-sm focus:outline-none focus:border-gray-500"
               autoFocus
             />
