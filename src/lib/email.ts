@@ -1,13 +1,4 @@
-import { Resend } from 'resend';
-
-// Initialize Resend only when API key is available
-function getResendClient() {
-  const apiKey = process.env.RESEND_API_KEY;
-  if (!apiKey) {
-    throw new Error('RESEND_API_KEY is not configured');
-  }
-  return new Resend(apiKey);
-}
+import nodemailer from 'nodemailer';
 
 interface WeekDay {
   date: string;
@@ -31,6 +22,23 @@ interface WeeklyEmailData {
     holidays: number;
     paidLeaves: number;
   };
+}
+
+function getTransporter() {
+  const email = process.env.GMAIL_EMAIL;
+  const password = process.env.GMAIL_APP_PASSWORD;
+
+  if (!email || !password) {
+    throw new Error('Gmail credentials are not configured. Set GMAIL_EMAIL and GMAIL_APP_PASSWORD.');
+  }
+
+  return nodemailer.createTransport({
+    service: 'gmail',
+    auth: {
+      user: email,
+      pass: password,
+    },
+  });
 }
 
 function getLocationColor(location: 'office' | 'home' | null): string {
@@ -138,18 +146,14 @@ export async function sendWeeklyEmail(
   data: WeeklyEmailData
 ): Promise<{ success: boolean; error?: string }> {
   try {
-    const resend = getResendClient();
-    const { error } = await resend.emails.send({
-      from: process.env.RESEND_FROM_EMAIL || 'Working From <noreply@resend.dev>',
-      to: [to],
+    const transporter = getTransporter();
+
+    await transporter.sendMail({
+      from: `Working From <${process.env.GMAIL_EMAIL}>`,
+      to: to,
       subject: `Your Week Ahead: ${data.weekStart} - ${data.weekEnd}`,
       html: generateEmailHtml(data),
     });
-
-    if (error) {
-      console.error('Failed to send email:', error);
-      return { success: false, error: error.message };
-    }
 
     return { success: true };
   } catch (error) {

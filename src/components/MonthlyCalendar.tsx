@@ -389,15 +389,14 @@ export default function MonthlyCalendar() {
             <span className="text-[10px] md:text-xs text-gray-400">Weekly Email</span>
             <button
               onClick={toggleWeeklyEmail}
-              className={`relative w-8 h-4 rounded-full transition-colors ${
+              className={`relative w-9 h-5 rounded-full transition-colors flex-shrink-0 ${
                 weeklyEmailEnabled ? 'bg-[#22c55e]' : 'bg-[var(--card-border)]'
               }`}
             >
               <div
-                className={`absolute top-0.5 w-3 h-3 rounded-full bg-white transition-transform ${
-                  weeklyEmailEnabled ? 'translate-x-4.5' : 'translate-x-0.5'
+                className={`absolute top-0.5 left-0.5 w-4 h-4 rounded-full bg-white transition-all duration-200 ${
+                  weeklyEmailEnabled ? 'translate-x-4' : 'translate-x-0'
                 }`}
-                style={{ transform: weeklyEmailEnabled ? 'translateX(18px)' : 'translateX(2px)' }}
               />
             </button>
           </div>
