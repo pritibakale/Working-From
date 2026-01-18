@@ -74,6 +74,38 @@ function isPaidLeaveDate(events: CalendarEvent[], dateStr: string): boolean {
   );
 }
 
+// Calculate total paid leave days used in a year
+function calculateYearlyPaidLeaves(events: CalendarEvent[], year: number, holidays: Holiday[]): number {
+  const holidayDatesSet = new Set(holidays.map((h) => h.date));
+  let totalDays = 0;
+
+  const paidLeaveEvents = events.filter((e) => e.type === 'paid-leave');
+
+  for (const event of paidLeaveEvents) {
+    const start = new Date(event.startDate + 'T00:00:00');
+    const end = new Date(event.endDate + 'T00:00:00');
+
+    // Iterate through each day in the event range
+    const current = new Date(start);
+    while (current <= end) {
+      const eventYear = current.getFullYear();
+      if (eventYear === year) {
+        const dateStr = formatDateString(eventYear, current.getMonth(), current.getDate());
+        // Only count if it's not a holiday and it's a work day
+        if (!holidayDatesSet.has(dateStr)) {
+          const location = getWorkLocation(eventYear, current.getMonth(), current.getDate());
+          if (location) {
+            totalDays++;
+          }
+        }
+      }
+      current.setDate(current.getDate() + 1);
+    }
+  }
+
+  return totalDays;
+}
+
 export default function MonthlyCalendar() {
   const today = new Date();
   const [currentMonth, setCurrentMonth] = useState(today.getMonth());
@@ -85,6 +117,9 @@ export default function MonthlyCalendar() {
   const [selectedDate, setSelectedDate] = useState('');
   const [selectedEvent, setSelectedEvent] = useState<CalendarEvent | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+  const [totalPaidLeaves, setTotalPaidLeaves] = useState(0);
+  const [showLeaveSettings, setShowLeaveSettings] = useState(false);
+  const [leaveInput, setLeaveInput] = useState('');
 
   // Fetch events from API
   const fetchEvents = useCallback(async () => {
@@ -112,15 +147,47 @@ export default function MonthlyCalendar() {
     }
   }, []);
 
+  // Fetch user settings
+  const fetchUserSettings = useCallback(async () => {
+    try {
+      const response = await fetch('/api/user/settings');
+      if (response.ok) {
+        const data = await response.json();
+        setTotalPaidLeaves(data.totalPaidLeaves || 0);
+        setLeaveInput(String(data.totalPaidLeaves || 0));
+      }
+    } catch (error) {
+      console.error('Failed to fetch user settings:', error);
+    }
+  }, []);
+
+  // Save total paid leaves
+  const saveTotalPaidLeaves = async () => {
+    try {
+      const value = parseInt(leaveInput) || 0;
+      const response = await fetch('/api/user/settings', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ totalPaidLeaves: value }),
+      });
+      if (response.ok) {
+        setTotalPaidLeaves(value);
+        setShowLeaveSettings(false);
+      }
+    } catch (error) {
+      console.error('Failed to save settings:', error);
+    }
+  };
+
   // Load data from API on mount
   useEffect(() => {
     const loadData = async () => {
       setIsLoading(true);
-      await Promise.all([fetchEvents(), fetchHolidays()]);
+      await Promise.all([fetchEvents(), fetchHolidays(), fetchUserSettings()]);
       setIsLoading(false);
     };
     loadData();
-  }, [fetchEvents, fetchHolidays]);
+  }, [fetchEvents, fetchHolidays, fetchUserSettings]);
 
   const daysInMonth = getDaysInMonth(currentYear, currentMonth);
   const firstDay = getFirstDayOfMonth(currentYear, currentMonth);
@@ -178,6 +245,9 @@ export default function MonthlyCalendar() {
     if (location === 'home') wfhCount++;
   }
 
+  // Calculate yearly paid leaves used
+  const yearlyPaidLeavesUsed = calculateYearlyPaidLeaves(events, currentYear, holidays);
+  const remainingPaidLeaves = totalPaidLeaves - yearlyPaidLeavesUsed;
 
   const handleDayClick = (day: number) => {
     const dateStr = formatDateString(currentYear, currentMonth, day);
@@ -418,6 +488,30 @@ export default function MonthlyCalendar() {
         </div>
       </div>
 
+      {/* Leave Balance */}
+      <div className="flex items-center justify-between mt-2 pt-2 border-t border-[var(--card-border)] shrink-0">
+        <div className="flex items-center gap-4">
+          <div className="flex items-center gap-2">
+            <span className="text-xs text-gray-400">Annual Leave Balance ({currentYear}):</span>
+            <span className={`text-sm font-bold ${remainingPaidLeaves < 0 ? 'text-red-400' : 'text-green-400'}`}>
+              {remainingPaidLeaves} / {totalPaidLeaves}
+            </span>
+            <span className="text-xs text-gray-500">
+              ({yearlyPaidLeavesUsed} used)
+            </span>
+          </div>
+        </div>
+        <button
+          onClick={() => {
+            setLeaveInput(String(totalPaidLeaves));
+            setShowLeaveSettings(true);
+          }}
+          className="px-2 py-1 text-xs bg-[var(--card-border)] hover:bg-[var(--card-border)]/80 rounded-lg transition-colors"
+        >
+          Set Total
+        </button>
+      </div>
+
       {/* Legend */}
       <div className="flex flex-wrap gap-3 mt-2 pt-2 border-t border-[var(--card-border)] shrink-0">
         <div className="flex items-center gap-2">
@@ -454,6 +548,57 @@ export default function MonthlyCalendar() {
         onAddHoliday={handleAddHoliday}
         onDeleteHoliday={handleDeleteHoliday}
       />
+
+      {/* Leave Settings Modal */}
+      {showLeaveSettings && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center">
+          <div className="absolute inset-0 bg-black/60" onClick={() => setShowLeaveSettings(false)} />
+          <div className="relative bg-[var(--card-bg)] border border-[var(--card-border)] rounded-xl p-5 w-full max-w-sm mx-4 shadow-xl">
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="text-lg font-semibold">Set Annual Paid Leaves</h3>
+              <button
+                onClick={() => setShowLeaveSettings(false)}
+                className="p-1 hover:bg-[var(--card-border)] rounded-lg transition-colors"
+              >
+                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              </button>
+            </div>
+
+            <div className="space-y-4">
+              <div>
+                <label className="block text-sm text-gray-400 mb-1">
+                  Total Paid Leaves for {currentYear}
+                </label>
+                <input
+                  type="number"
+                  value={leaveInput}
+                  onChange={(e) => setLeaveInput(e.target.value)}
+                  min="0"
+                  className="w-full px-3 py-2 bg-[var(--background)] border border-[var(--card-border)] rounded-lg text-sm focus:outline-none focus:border-gray-500"
+                  autoFocus
+                />
+              </div>
+
+              <div className="flex gap-2">
+                <button
+                  onClick={() => setShowLeaveSettings(false)}
+                  className="flex-1 px-4 py-2 text-sm bg-[var(--card-border)] hover:bg-[var(--card-border)]/80 rounded-lg transition-colors"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={saveTotalPaidLeaves}
+                  className="flex-1 px-4 py-2 text-sm bg-[#f97316] hover:bg-[#f97316]/80 rounded-lg transition-colors text-white"
+                >
+                  Save
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

@@ -5,6 +5,7 @@ export interface IUser extends Document {
   name: string;
   image?: string;
   googleId: string;
+  totalPaidLeaves: number;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -30,6 +31,10 @@ const UserSchema = new Schema<IUser>(
       type: String,
       required: [true, 'Google ID is required'],
       unique: true,
+    },
+    totalPaidLeaves: {
+      type: Number,
+      default: 0,
     },
   },
   {
