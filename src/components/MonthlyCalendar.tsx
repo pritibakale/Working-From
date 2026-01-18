@@ -120,6 +120,7 @@ export default function MonthlyCalendar() {
   const [totalPaidLeaves, setTotalPaidLeaves] = useState(0);
   const [showLeaveSettings, setShowLeaveSettings] = useState(false);
   const [leaveInput, setLeaveInput] = useState('');
+  const [weeklyEmailEnabled, setWeeklyEmailEnabled] = useState(false);
 
   // Fetch events from API
   const fetchEvents = useCallback(async () => {
@@ -155,6 +156,7 @@ export default function MonthlyCalendar() {
         const data = await response.json();
         setTotalPaidLeaves(data.totalPaidLeaves || 0);
         setLeaveInput(String(data.totalPaidLeaves || 0));
+        setWeeklyEmailEnabled(data.weeklyEmailEnabled || false);
       }
     } catch (error) {
       console.error('Failed to fetch user settings:', error);
@@ -176,6 +178,23 @@ export default function MonthlyCalendar() {
       }
     } catch (error) {
       console.error('Failed to save settings:', error);
+    }
+  };
+
+  // Toggle weekly email
+  const toggleWeeklyEmail = async () => {
+    try {
+      const newValue = !weeklyEmailEnabled;
+      const response = await fetch('/api/user/settings', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ weeklyEmailEnabled: newValue }),
+      });
+      if (response.ok) {
+        setWeeklyEmailEnabled(newValue);
+      }
+    } catch (error) {
+      console.error('Failed to toggle weekly email:', error);
     }
   };
 
@@ -579,6 +598,25 @@ export default function MonthlyCalendar() {
                   className="w-full px-3 py-2 bg-[var(--background)] border border-[var(--card-border)] rounded-lg text-sm focus:outline-none focus:border-gray-500"
                   autoFocus
                 />
+              </div>
+
+              <div className="flex items-center justify-between p-3 bg-[var(--background)] border border-[var(--card-border)] rounded-lg">
+                <div>
+                  <div className="text-sm font-medium">Weekly Email Summary</div>
+                  <div className="text-xs text-gray-400">Get your week ahead every Monday</div>
+                </div>
+                <button
+                  onClick={toggleWeeklyEmail}
+                  className={`relative w-12 h-6 rounded-full transition-colors ${
+                    weeklyEmailEnabled ? 'bg-[#22c55e]' : 'bg-[var(--card-border)]'
+                  }`}
+                >
+                  <div
+                    className={`absolute top-1 w-4 h-4 rounded-full bg-white transition-transform ${
+                      weeklyEmailEnabled ? 'translate-x-7' : 'translate-x-1'
+                    }`}
+                  />
+                </button>
               </div>
 
               <div className="flex gap-2">

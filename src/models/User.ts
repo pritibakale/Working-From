@@ -6,6 +6,7 @@ export interface IUser extends Document {
   image?: string;
   googleId: string;
   totalPaidLeaves: number;
+  weeklyEmailEnabled: boolean;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -35,6 +36,10 @@ const UserSchema = new Schema<IUser>(
     totalPaidLeaves: {
       type: Number,
       default: 0,
+    },
+    weeklyEmailEnabled: {
+      type: Boolean,
+      default: false,
     },
   },
   {

@@ -21,6 +21,7 @@ export async function GET() {
 
     return NextResponse.json({
       totalPaidLeaves: user.totalPaidLeaves || 0,
+      weeklyEmailEnabled: user.weeklyEmailEnabled || false,
     });
   } catch (error) {
     console.error('Error fetching user settings:', error);
@@ -40,9 +41,18 @@ export async function PUT(request: NextRequest) {
     await connectDB();
     const body = await request.json();
 
+    const updateData: { totalPaidLeaves?: number; weeklyEmailEnabled?: boolean } = {};
+
+    if (body.totalPaidLeaves !== undefined) {
+      updateData.totalPaidLeaves = body.totalPaidLeaves;
+    }
+    if (body.weeklyEmailEnabled !== undefined) {
+      updateData.weeklyEmailEnabled = body.weeklyEmailEnabled;
+    }
+
     const user = await User.findByIdAndUpdate(
       session.user.id,
-      { totalPaidLeaves: body.totalPaidLeaves },
+      updateData,
       { new: true }
     );
 
@@ -52,6 +62,7 @@ export async function PUT(request: NextRequest) {
 
     return NextResponse.json({
       totalPaidLeaves: user.totalPaidLeaves,
+      weeklyEmailEnabled: user.weeklyEmailEnabled,
     });
   } catch (error) {
     console.error('Error updating user settings:', error);
