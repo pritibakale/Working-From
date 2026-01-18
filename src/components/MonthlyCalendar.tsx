@@ -385,6 +385,22 @@ export default function MonthlyCalendar() {
           >
             Holidays
           </button>
+          <div className="flex items-center gap-1.5 ml-2 pl-2 border-l border-[var(--card-border)]">
+            <span className="text-[10px] md:text-xs text-gray-400">Weekly Email</span>
+            <button
+              onClick={toggleWeeklyEmail}
+              className={`relative w-8 h-4 rounded-full transition-colors ${
+                weeklyEmailEnabled ? 'bg-[#22c55e]' : 'bg-[var(--card-border)]'
+              }`}
+            >
+              <div
+                className={`absolute top-0.5 w-3 h-3 rounded-full bg-white transition-transform ${
+                  weeklyEmailEnabled ? 'translate-x-4.5' : 'translate-x-0.5'
+                }`}
+                style={{ transform: weeklyEmailEnabled ? 'translateX(18px)' : 'translateX(2px)' }}
+              />
+            </button>
+          </div>
         </div>
         <div className="flex items-center gap-2 md:gap-3">
           <button
@@ -598,25 +614,6 @@ export default function MonthlyCalendar() {
                   className="w-full px-3 py-2 bg-[var(--background)] border border-[var(--card-border)] rounded-lg text-sm focus:outline-none focus:border-gray-500"
                   autoFocus
                 />
-              </div>
-
-              <div className="flex items-center justify-between p-3 bg-[var(--background)] border border-[var(--card-border)] rounded-lg">
-                <div>
-                  <div className="text-sm font-medium">Weekly Email Summary</div>
-                  <div className="text-xs text-gray-400">Get your week ahead every Monday</div>
-                </div>
-                <button
-                  onClick={toggleWeeklyEmail}
-                  className={`relative w-12 h-6 rounded-full transition-colors ${
-                    weeklyEmailEnabled ? 'bg-[#22c55e]' : 'bg-[var(--card-border)]'
-                  }`}
-                >
-                  <div
-                    className={`absolute top-1 w-4 h-4 rounded-full bg-white transition-transform ${
-                      weeklyEmailEnabled ? 'translate-x-7' : 'translate-x-1'
-                    }`}
-                  />
-                </button>
               </div>
 
               <div className="flex gap-2">
