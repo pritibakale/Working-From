@@ -5,18 +5,19 @@ import { Holiday } from '@/types';
 
 // Sample holidays - in a real app this would come from props or API
 const sampleHolidays: Holiday[] = [
-  { date: new Date(2026, 0, 1), name: "New Year's Day" },
-  { date: new Date(2026, 0, 26), name: 'Republic Day' },
-  { date: new Date(2026, 2, 17), name: 'Holi' },
-  { date: new Date(2026, 3, 14), name: 'Good Friday' },
-  { date: new Date(2026, 7, 15), name: 'Independence Day' },
-  { date: new Date(2026, 9, 2), name: 'Gandhi Jayanti' },
-  { date: new Date(2026, 9, 20), name: 'Dussehra' },
-  { date: new Date(2026, 10, 9), name: 'Diwali' },
-  { date: new Date(2026, 11, 25), name: 'Christmas' },
+  { id: '1', date: '2026-01-01', name: "New Year's Day" },
+  { id: '2', date: '2026-01-26', name: 'Republic Day' },
+  { id: '3', date: '2026-03-17', name: 'Holi' },
+  { id: '4', date: '2026-04-14', name: 'Good Friday' },
+  { id: '5', date: '2026-08-15', name: 'Independence Day' },
+  { id: '6', date: '2026-10-02', name: 'Gandhi Jayanti' },
+  { id: '7', date: '2026-10-20', name: 'Dussehra' },
+  { id: '8', date: '2026-11-09', name: 'Diwali' },
+  { id: '9', date: '2026-12-25', name: 'Christmas' },
 ];
 
-function formatDate(date: Date): string {
+function formatDate(dateStr: string): string {
+  const date = new Date(dateStr + 'T00:00:00');
   return date.toLocaleDateString('en-US', {
     weekday: 'short',
     month: 'short',
@@ -24,13 +25,15 @@ function formatDate(date: Date): string {
   });
 }
 
-function isUpcoming(date: Date): boolean {
+function isUpcoming(dateStr: string): boolean {
+  const date = new Date(dateStr + 'T00:00:00');
   const today = new Date();
   today.setHours(0, 0, 0, 0);
   return date >= today;
 }
 
-function getDaysUntil(date: Date): number {
+function getDaysUntil(dateStr: string): number {
+  const date = new Date(dateStr + 'T00:00:00');
   const today = new Date();
   today.setHours(0, 0, 0, 0);
   const diffTime = date.getTime() - today.getTime();

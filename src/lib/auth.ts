@@ -14,19 +14,26 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
     async signIn({ user, account }) {
       if (account?.provider === 'google') {
         try {
+          console.log('Connecting to database...');
           await connectDB();
+          console.log('Database connected successfully');
 
           // Check if user already exists
+          console.log('Checking for existing user with googleId:', account.providerAccountId);
           const existingUser = await User.findOne({ googleId: account.providerAccountId });
 
           if (!existingUser) {
             // Create new user
+            console.log('Creating new user:', user.email);
             await User.create({
               email: user.email,
               name: user.name,
               image: user.image,
               googleId: account.providerAccountId,
             });
+            console.log('User created successfully');
+          } else {
+            console.log('User already exists');
           }
 
           return true;
