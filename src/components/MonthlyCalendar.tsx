@@ -379,12 +379,6 @@ export default function MonthlyCalendar() {
       <div className="flex items-center justify-between mb-2 shrink-0">
         <div className="flex items-center gap-2">
           <h2 className="text-base md:text-lg font-semibold">Monthly Schedule</h2>
-          <button
-            onClick={() => setHolidayModalOpen(true)}
-            className="px-2 py-1 text-xs bg-[var(--accent-leave)] hover:bg-[var(--accent-leave)]/80 text-white rounded-lg transition-colors"
-          >
-            Holidays
-          </button>
           <div className="flex items-center gap-1.5 ml-2 pl-2 border-l border-[var(--card-border)]">
             <span className="text-[10px] md:text-xs text-gray-400">Weekly Email</span>
             <button
@@ -535,15 +529,23 @@ export default function MonthlyCalendar() {
             </span>
           </div>
         </div>
-        <button
-          onClick={() => {
-            setLeaveInput(String(totalPaidLeaves));
-            setShowLeaveSettings(true);
-          }}
-          className="px-2 py-1 text-xs bg-[var(--card-border)] hover:bg-[var(--card-border)]/80 rounded-lg transition-colors"
-        >
-          Set Total
-        </button>
+        <div className="flex items-center gap-2">
+          <button
+            onClick={() => setHolidayModalOpen(true)}
+            className="px-2 py-1 text-xs bg-[var(--accent-leave)] hover:bg-[var(--accent-leave)]/80 text-white rounded-lg transition-colors"
+          >
+            Set Holidays
+          </button>
+          <button
+            onClick={() => {
+              setLeaveInput(String(totalPaidLeaves));
+              setShowLeaveSettings(true);
+            }}
+            className="px-2 py-1 text-xs bg-[var(--card-border)] hover:bg-[var(--card-border)]/80 rounded-lg transition-colors"
+          >
+            Set Total
+          </button>
+        </div>
       </div>
 
       {/* Legend */}
