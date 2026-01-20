@@ -1,5 +1,18 @@
 import mongoose, { Schema, Document } from 'mongoose';
 
+export interface IWorkSchedule {
+  days: {
+    0: string | null;
+    1: string | null;
+    2: string | null;
+    3: string | null;
+    4: string | null;
+    5: string | null;
+    6: string | null;
+  };
+  alternateReferenceDate: string;
+}
+
 export interface IUser extends Document {
   email: string;
   name: string;
@@ -7,6 +20,7 @@ export interface IUser extends Document {
   googleId: string;
   totalPaidLeaves: number;
   weeklyEmailEnabled: boolean;
+  workSchedule?: IWorkSchedule;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -40,6 +54,32 @@ const UserSchema = new Schema<IUser>(
     weeklyEmailEnabled: {
       type: Boolean,
       default: false,
+    },
+    workSchedule: {
+      type: {
+        days: {
+          0: { type: String, default: null },
+          1: { type: String, default: 'office' },
+          2: { type: String, default: 'office' },
+          3: { type: String, default: 'home' },
+          4: { type: String, default: 'home' },
+          5: { type: String, default: 'alternate' },
+          6: { type: String, default: null },
+        },
+        alternateReferenceDate: { type: String, default: '2026-01-23' },
+      },
+      default: {
+        days: {
+          0: null,
+          1: 'office',
+          2: 'office',
+          3: 'home',
+          4: 'home',
+          5: 'alternate',
+          6: null,
+        },
+        alternateReferenceDate: '2026-01-23',
+      },
     },
   },
   {

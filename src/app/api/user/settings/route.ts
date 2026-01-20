@@ -1,7 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { auth } from '@/lib/auth';
 import connectDB from '@/lib/mongodb';
-import User from '@/models/User';
+import User, { IWorkSchedule } from '@/models/User';
+import { DEFAULT_WORK_SCHEDULE } from '@/types';
 
 // GET user settings
 export async function GET() {
@@ -22,6 +23,7 @@ export async function GET() {
     return NextResponse.json({
       totalPaidLeaves: user.totalPaidLeaves || 0,
       weeklyEmailEnabled: user.weeklyEmailEnabled || false,
+      workSchedule: user.workSchedule || DEFAULT_WORK_SCHEDULE,
     });
   } catch (error) {
     console.error('Error fetching user settings:', error);
@@ -41,13 +43,16 @@ export async function PUT(request: NextRequest) {
     await connectDB();
     const body = await request.json();
 
-    const updateData: { totalPaidLeaves?: number; weeklyEmailEnabled?: boolean } = {};
+    const updateData: { totalPaidLeaves?: number; weeklyEmailEnabled?: boolean; workSchedule?: IWorkSchedule } = {};
 
     if (body.totalPaidLeaves !== undefined) {
       updateData.totalPaidLeaves = body.totalPaidLeaves;
     }
     if (body.weeklyEmailEnabled !== undefined) {
       updateData.weeklyEmailEnabled = body.weeklyEmailEnabled;
+    }
+    if (body.workSchedule !== undefined) {
+      updateData.workSchedule = body.workSchedule;
     }
 
     const user = await User.findByIdAndUpdate(
@@ -63,6 +68,7 @@ export async function PUT(request: NextRequest) {
     return NextResponse.json({
       totalPaidLeaves: user.totalPaidLeaves,
       weeklyEmailEnabled: user.weeklyEmailEnabled,
+      workSchedule: user.workSchedule || DEFAULT_WORK_SCHEDULE,
     });
   } catch (error) {
     console.error('Error updating user settings:', error);

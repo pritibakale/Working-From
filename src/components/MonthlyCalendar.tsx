@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect, useCallback } from 'react';
-import { WorkLocation, CalendarEvent, Holiday } from '@/types';
+import { WorkLocation, CalendarEvent, Holiday, WorkSchedule, DayType, DEFAULT_WORK_SCHEDULE } from '@/types';
 import EventModal from './EventModal';
 import HolidayModal from './HolidayModal';
 
@@ -12,9 +12,6 @@ const MONTHS = [
   'July', 'August', 'September', 'October', 'November', 'December'
 ];
 
-// Reference Friday that is a WFO day (Jan 23, 2026)
-const REFERENCE_OFFICE_FRIDAY = new Date(2026, 0, 23);
-
 function getDaysInMonth(year: number, month: number): number {
   return new Date(year, month + 1, 0).getDate();
 }
@@ -23,29 +20,27 @@ function getFirstDayOfMonth(year: number, month: number): number {
   return new Date(year, month, 1).getDay();
 }
 
-function getWorkLocation(year: number, month: number, day: number): WorkLocation {
+function getWorkLocation(year: number, month: number, day: number, workSchedule: WorkSchedule): WorkLocation {
   const date = new Date(year, month, day);
-  const dayOfWeek = date.getDay();
+  const dayOfWeek = date.getDay() as 0 | 1 | 2 | 3 | 4 | 5 | 6;
+  const dayType = workSchedule.days[dayOfWeek];
 
-  // Weekend - no work
-  if (dayOfWeek === 0 || dayOfWeek === 6) {
+  if (dayType === null) {
     return null;
   }
 
-  // Monday (1) and Tuesday (2) - Office
-  if (dayOfWeek === 1 || dayOfWeek === 2) {
+  if (dayType === 'office') {
     return 'office';
   }
 
-  // Wednesday (3) and Thursday (4) - Home
-  if (dayOfWeek === 3 || dayOfWeek === 4) {
+  if (dayType === 'home') {
     return 'home';
   }
 
-  // Friday (5) - Alternate (Jan 23, 2026 is Office)
-  if (dayOfWeek === 5) {
-    // Calculate weeks difference from reference Friday
-    const diffTime = date.getTime() - REFERENCE_OFFICE_FRIDAY.getTime();
+  // Alternate day - calculate based on reference date
+  if (dayType === 'alternate') {
+    const referenceDate = new Date(workSchedule.alternateReferenceDate + 'T00:00:00');
+    const diffTime = date.getTime() - referenceDate.getTime();
     const diffWeeks = Math.round(diffTime / (7 * 24 * 60 * 60 * 1000));
     // Even weeks from reference = Office, Odd weeks = Home
     return diffWeeks % 2 === 0 ? 'office' : 'home';
@@ -75,7 +70,7 @@ function isPaidLeaveDate(events: CalendarEvent[], dateStr: string): boolean {
 }
 
 // Calculate total paid leave days used in a year
-function calculateYearlyPaidLeaves(events: CalendarEvent[], year: number, holidays: Holiday[]): number {
+function calculateYearlyPaidLeaves(events: CalendarEvent[], year: number, holidays: Holiday[], workSchedule: WorkSchedule): number {
   const holidayDatesSet = new Set(holidays.map((h) => h.date));
   let totalDays = 0;
 
@@ -93,7 +88,7 @@ function calculateYearlyPaidLeaves(events: CalendarEvent[], year: number, holida
         const dateStr = formatDateString(eventYear, current.getMonth(), current.getDate());
         // Only count if it's not a holiday and it's a work day
         if (!holidayDatesSet.has(dateStr)) {
-          const location = getWorkLocation(eventYear, current.getMonth(), current.getDate());
+          const location = getWorkLocation(eventYear, current.getMonth(), current.getDate(), workSchedule);
           if (location) {
             totalDays++;
           }
@@ -121,6 +116,9 @@ export default function MonthlyCalendar() {
   const [showLeaveSettings, setShowLeaveSettings] = useState(false);
   const [leaveInput, setLeaveInput] = useState('');
   const [weeklyEmailEnabled, setWeeklyEmailEnabled] = useState(false);
+  const [workSchedule, setWorkSchedule] = useState<WorkSchedule>(DEFAULT_WORK_SCHEDULE);
+  const [showScheduleSettings, setShowScheduleSettings] = useState(false);
+  const [tempSchedule, setTempSchedule] = useState<WorkSchedule>(DEFAULT_WORK_SCHEDULE);
 
   // Fetch events from API
   const fetchEvents = useCallback(async () => {
@@ -157,6 +155,10 @@ export default function MonthlyCalendar() {
         setTotalPaidLeaves(data.totalPaidLeaves || 0);
         setLeaveInput(String(data.totalPaidLeaves || 0));
         setWeeklyEmailEnabled(data.weeklyEmailEnabled || false);
+        if (data.workSchedule) {
+          setWorkSchedule(data.workSchedule);
+          setTempSchedule(data.workSchedule);
+        }
       }
     } catch (error) {
       console.error('Failed to fetch user settings:', error);
@@ -196,6 +198,34 @@ export default function MonthlyCalendar() {
     } catch (error) {
       console.error('Failed to toggle weekly email:', error);
     }
+  };
+
+  // Save work schedule
+  const saveWorkSchedule = async () => {
+    try {
+      const response = await fetch('/api/user/settings', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ workSchedule: tempSchedule }),
+      });
+      if (response.ok) {
+        setWorkSchedule(tempSchedule);
+        setShowScheduleSettings(false);
+      }
+    } catch (error) {
+      console.error('Failed to save work schedule:', error);
+    }
+  };
+
+  // Update temp schedule day
+  const updateTempScheduleDay = (dayIndex: 0 | 1 | 2 | 3 | 4 | 5 | 6, value: DayType) => {
+    setTempSchedule((prev) => ({
+      ...prev,
+      days: {
+        ...prev.days,
+        [dayIndex]: value,
+      },
+    }));
   };
 
   // Load data from API on mount
@@ -251,7 +281,7 @@ export default function MonthlyCalendar() {
     // Skip if this day is a holiday
     if (holidayDatesSet.has(dateStr)) continue;
 
-    const location = getWorkLocation(currentYear, currentMonth, day);
+    const location = getWorkLocation(currentYear, currentMonth, day, workSchedule);
     const hasPaidLeave = isPaidLeaveDate(events, dateStr);
 
     // Count paid leave days (only on work days)
@@ -265,7 +295,7 @@ export default function MonthlyCalendar() {
   }
 
   // Calculate yearly paid leaves used
-  const yearlyPaidLeavesUsed = calculateYearlyPaidLeaves(events, currentYear, holidays);
+  const yearlyPaidLeavesUsed = calculateYearlyPaidLeaves(events, currentYear, holidays, workSchedule);
   const remainingPaidLeaves = totalPaidLeaves - yearlyPaidLeavesUsed;
 
   const handleDayClick = (day: number) => {
@@ -435,7 +465,7 @@ export default function MonthlyCalendar() {
             return <div key={`empty-${index}`} className="border border-[var(--card-border)] rounded" />;
           }
 
-          const location = getWorkLocation(currentYear, currentMonth, day);
+          const location = getWorkLocation(currentYear, currentMonth, day, workSchedule);
           const isToday =
             day === today.getDate() &&
             currentMonth === today.getMonth() &&
@@ -530,6 +560,15 @@ export default function MonthlyCalendar() {
           </div>
         </div>
         <div className="flex items-center gap-2">
+          <button
+            onClick={() => {
+              setTempSchedule(workSchedule);
+              setShowScheduleSettings(true);
+            }}
+            className="px-2 py-1 text-xs bg-[var(--accent-office)] hover:bg-[var(--accent-office)]/80 text-white rounded-lg transition-colors"
+          >
+            Set Schedule
+          </button>
           <button
             onClick={() => setHolidayModalOpen(true)}
             className="px-2 py-1 text-xs bg-[var(--accent-leave)] hover:bg-[var(--accent-leave)]/80 text-white rounded-lg transition-colors"
@@ -627,6 +666,81 @@ export default function MonthlyCalendar() {
                 <button
                   onClick={saveTotalPaidLeaves}
                   className="flex-1 px-4 py-2 text-sm bg-[#f97316] hover:bg-[#f97316]/80 rounded-lg transition-colors text-white"
+                >
+                  Save
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Work Schedule Settings Modal */}
+      {showScheduleSettings && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center">
+          <div className="absolute inset-0 bg-black/60" onClick={() => setShowScheduleSettings(false)} />
+          <div className="relative bg-[var(--card-bg)] border border-[var(--card-border)] rounded-xl p-5 w-full max-w-md mx-4 shadow-xl">
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="text-lg font-semibold">Configure Work Schedule</h3>
+              <button
+                onClick={() => setShowScheduleSettings(false)}
+                className="p-1 hover:bg-[var(--card-border)] rounded-lg transition-colors"
+              >
+                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              </button>
+            </div>
+
+            <div className="space-y-4">
+              <p className="text-xs text-gray-400">Set each day as Office, WFH, Alternate (weekly rotation), or Off.</p>
+
+              <div className="space-y-2">
+                {DAYS_OF_WEEK.map((dayName, index) => (
+                  <div key={dayName} className="flex items-center justify-between">
+                    <span className="text-sm font-medium w-24">{dayName}</span>
+                    <select
+                      value={tempSchedule.days[index as 0 | 1 | 2 | 3 | 4 | 5 | 6] || 'null'}
+                      onChange={(e) => {
+                        const value = e.target.value === 'null' ? null : e.target.value as DayType;
+                        updateTempScheduleDay(index as 0 | 1 | 2 | 3 | 4 | 5 | 6, value);
+                      }}
+                      className="flex-1 ml-4 px-3 py-1.5 bg-[var(--background)] border border-[var(--card-border)] rounded-lg text-sm focus:outline-none focus:border-gray-500"
+                    >
+                      <option value="null">Off (Weekend)</option>
+                      <option value="office">Office</option>
+                      <option value="home">WFH</option>
+                      <option value="alternate">Alternate</option>
+                    </select>
+                  </div>
+                ))}
+              </div>
+
+              <div>
+                <label className="block text-sm text-gray-400 mb-1">
+                  Alternate Reference Date (Office day)
+                </label>
+                <input
+                  type="date"
+                  value={tempSchedule.alternateReferenceDate}
+                  onChange={(e) => setTempSchedule((prev) => ({ ...prev, alternateReferenceDate: e.target.value }))}
+                  className="w-full px-3 py-2 bg-[var(--background)] border border-[var(--card-border)] rounded-lg text-sm focus:outline-none focus:border-gray-500"
+                />
+                <p className="text-xs text-gray-500 mt-1">
+                  For &quot;Alternate&quot; days, this date is an Office day. The pattern alternates weekly.
+                </p>
+              </div>
+
+              <div className="flex gap-2">
+                <button
+                  onClick={() => setShowScheduleSettings(false)}
+                  className="flex-1 px-4 py-2 text-sm bg-[var(--card-border)] hover:bg-[var(--card-border)]/80 rounded-lg transition-colors"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={saveWorkSchedule}
+                  className="flex-1 px-4 py-2 text-sm bg-[var(--accent-office)] hover:bg-[var(--accent-office)]/80 rounded-lg transition-colors text-white"
                 >
                   Save
                 </button>
